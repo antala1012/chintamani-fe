@@ -1,8 +1,11 @@
+import useApi from "@/hooks/useApi";
+import { apiPath } from "@/lib/api-path";
 import { PHONE_CODE_REGEX, PINCODE_REGEX } from "@/lib/constant";
 import { formatPhoneNumber } from "@/lib/utils";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import PhoneInput from "react-phone-input-2";
 import { useSelector } from "react-redux";
+import Select from "react-select";
 
 const renderCountView = (val: number) => {
   return (
@@ -17,18 +20,28 @@ const SideComponent = ({
   setAddress,
   contact,
   setContact,
+  setCurrency,
+  currency,
   setIsSave,
 }: any) => {
   const [open, setOpen] = useState(1);
+  const [currencyOption, setCurrencyOption] = useState<any>([]);
   const {
     auth: { user },
   } = useSelector((state: any) => state);
+  const { apiAction } = useApi();
 
   const [error, setError] = useState<any>({});
   const handleChange = (name: string, value: string) => {
     setAddress({ ...address, [name]: value });
     setError({ ...error, [name]: "" });
   };
+
+  const handleSelectChange = (name: string, value: any) => {
+    setCurrency({ value: value.value, price: value?.price });
+    setError({ ...error, [name]: "" });
+  }
+
   const onAddress = () => {
     let err: any = {};
     if (!address?.city) {
@@ -52,6 +65,9 @@ const SideComponent = ({
     if (!address?.country) {
       err = { ...err, country: "Please enter country" };
     }
+    if (!currency) {
+      err = { ...err, currency: "Please Select currency" };
+    }
     if (Object.keys(err).length > 0) {
       setError(err);
       return;
@@ -64,6 +80,27 @@ const SideComponent = ({
     setContact(formattedPhoneNumber);
     setError({ ...error, contact: "" });
   };
+
+  const getCurrency = async () => {
+    let data = await apiAction({
+      method: "get",
+      url: `${apiPath?.currency?.getCurrency}?page=1&pageSize=100`,
+    });
+
+    const currenciesData = data.data.CurrencyData.map(
+      (currency: any) => ({
+        value: currency.name,
+        label: currency.name,
+        price: currency.currencypriceid.value,
+      })
+    );
+
+    setCurrencyOption(currenciesData);
+  }
+
+  useEffect(() => {
+    getCurrency()
+  }, [])
 
   return (
     <div>
@@ -165,6 +202,19 @@ const SideComponent = ({
                       )}
                     </div>
                   </div>
+                  <Select
+                    options={currencyOption}
+                    placeholder="Select a currency"
+                    className="cursor-pointer mt-2 "
+                    onChange={(e) => handleSelectChange("currency", e)}
+                    isSearchable
+                    value={currencyOption.find((it: any) => it.value === currency)}
+                  />
+                  {error?.currency && (
+                    <p className="text-red-500 text-xs mt-2">
+                      {error?.currency}
+                    </p>
+                  )}
                 </div>
                 <div className="flex justify-end px-5">
                   <button
@@ -196,9 +246,8 @@ const SideComponent = ({
                       <span className="text-gray-600 font-semibold">Name</span>
                     </div>
                     <div className="flex-grow ">
-                      <span>{`${user?.firstname || ""} ${
-                        user?.lastname || ""
-                      }`}</span>
+                      <span>{`${user?.firstname || ""} ${user?.lastname || ""
+                        }`}</span>
                     </div>
                   </div>
                   <div className="w-full flex mb-3 items-center">
@@ -211,18 +260,26 @@ const SideComponent = ({
                       <span>{`${contact || user?.mobile || ""} `}</span>
                     </div>
                   </div>
-                  <div className="w-full flex items-center">
+                  <div className="w-full flex mb-3 items-center">
                     <div className="w-32">
+                      <span className="text-gray-600 font-semibold">
+                        Currency
+                      </span>
+                    </div>
+                    <div className="flex-grow ">
+                      <span>{`${currency.value} `}</span>
+                    </div>
+                  </div>
+                  <div className="w-full flex items-start">
+                    <div className="max-w-[128px] w-full">
                       <span className="text-gray-600 font-semibold">
                         Billing Address
                       </span>
                     </div>
-                    <div className="flex-grow pl-3">
-                      <span>{`${address?.address || ""}, ${
-                        address?.city || ""
-                      }, ${address?.pincode || ""}, ${
-                        address?.country || ""
-                      }`}</span>
+                    <div className="flex-grow">
+                      <span>{`${address?.address || ""}, ${address?.city || ""
+                        }, ${address?.pincode || ""}, ${address?.country || ""
+                        }`}</span>
                     </div>
                   </div>
                 </div>

@@ -1,12 +1,12 @@
-import { useCallback, useState } from "react";
-import SideComponent from "./SideComponent";
-import useRazorpay from "react-razorpay";
 import useApi from "@/hooks/useApi";
 import { apiPath } from "@/lib/api-path";
-import { useDispatch, useSelector } from "react-redux";
 import { addCartProduct } from "@/redux/reducer/cart";
-import { toast } from "react-toastify";
+import { useCallback, useState } from "react";
+import useRazorpay from "react-razorpay";
+import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import SideComponent from "./SideComponent";
 
 const VITE_RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID;
 const VITE_RAZORPAY_KEY_SECRET = import.meta.env.VITE_RAZORPAY_KEY_SECRET;
@@ -15,6 +15,7 @@ const CheckoutComponent = () => {
 	const dispatch = useDispatch();
 	const [address, setAddress] = useState({});
 	const [contact, setContact] = useState();
+	const [currency, setCurrency] = useState({ value: "", price: "" });
 	const [isSave, setIsSave] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 	const navigate = useNavigate();
@@ -64,6 +65,7 @@ const CheckoutComponent = () => {
 
 	const createOrder = async (params: any) => {
 		try {
+			const totalPrice = +params?.totalprice * +currency?.price;
 			// First API call to create an order
 			const data = await apiAction({
 				method: "post",
@@ -71,8 +73,10 @@ const CheckoutComponent = () => {
 				data: {
 					userid: params?.userid,
 					totalprice: params?.totalprice,
+					calculatedPrice: totalPrice,
 					mobile: contact,
 					address: JSON.stringify(address),
+					currency: currency.value,
 				},
 				headers: { Authorization: `Bearer ${token}` },
 			});
@@ -103,7 +107,6 @@ const CheckoutComponent = () => {
 		try {
 			const params = { userid: user?.id, totalprice: handleTotalAmount() };
 			const order = await createOrder(params);
-			console.log(order, "order");
 			const options = {
 				key: VITE_RAZORPAY_KEY_ID,
 				secret: VITE_RAZORPAY_KEY_SECRET,
@@ -113,7 +116,6 @@ const CheckoutComponent = () => {
 				description: "Test Transaction",
 				order_id: order?.data?.orderDetails?.id,
 				handler: (res: Object) => {
-					console.log(res, "ress++");
 					updateOrder(order?.data?.id);
 					toast.success("Payment success");
 					navigate("/");
@@ -249,6 +251,8 @@ const CheckoutComponent = () => {
 								setAddress={setAddress}
 								contact={contact}
 								setContact={setContact}
+								setCurrency={setCurrency}
+								currency={currency}
 								setIsSave={setIsSave}
 							/>
 

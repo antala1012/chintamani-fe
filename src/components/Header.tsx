@@ -1,9 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import MainLogo from "../../public/assests/Images/main-logo.png";
 import LogoShape from "../../public/assests/Images/logo-shape.png";
+import MainLogo from "../../public/assests/Images/main-logo.png";
 
-import CVD from "../../public/assests/Images/cvd.png";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import useApi from "@/hooks/useApi";
+import { apiPath } from "@/lib/api-path";
+import { Category, subCategory } from "@/lib/interfaces/category";
+import { handleLogout, setUser } from "@/redux/reducer/auth";
+import {
+  addCartProduct,
+  addWishLishProduct,
+  setOpenCart,
+} from "@/redux/reducer/cart";
+import { setCategory, setFilterProduct } from "@/redux/reducer/category";
 import { faWhatsapp } from "@fortawesome/free-brands-svg-icons";
 import {
   faBars,
@@ -12,20 +20,13 @@ import {
   faSearch,
   faUser,
 } from "@fortawesome/free-solid-svg-icons";
-import { Link, useNavigate } from "react-router-dom";
-import { apiPath } from "@/lib/api-path";
-import { Category, subCategory } from "@/lib/interfaces/category";
-import { useDispatch, useSelector } from "react-redux";
-import { setCategory, setFilterProduct } from "@/redux/reducer/category";
-import useApi from "@/hooks/useApi";
-import { handleLogout } from "@/redux/reducer/auth";
-import {
-  addCartProduct,
-  addWishLishProduct,
-  setOpenCart,
-} from "@/redux/reducer/cart";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import axios from "axios";
+import { useDispatch, useSelector } from "react-redux";
+import { Link, useNavigate } from "react-router-dom";
 import Select from "react-select";
+import { toast } from "react-toastify";
+import CVD from "../../public/assests/Images/cvd.png";
 
 interface Props {
   setOpenCart?: () => void;
@@ -63,7 +64,7 @@ const Header = ({}: Props) => {
     if (modalRef.current && !modalRef?.current?.contains(e.target)) {
       setMenuOpen(false);
     }
-  };
+  };  
 
   useEffect(() => {
     if (menuOpen) {
@@ -170,6 +171,7 @@ const Header = ({}: Props) => {
   const [countries, setCountries] = useState<Country[]>([]);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);  
 
   useEffect(() => {
     // Fetch countries along with currencies
@@ -213,34 +215,53 @@ const Header = ({}: Props) => {
         console.error("Error fetching currencies:", error);
       });
 
-    const storedCountry = localStorage.getItem("selectedCountry");
-    if (storedCountry) {
-      try {
-        const parsedCountry = JSON.parse(storedCountry);
-        const reconstructedCountry = {
-          ...parsedCountry,
-          label: (
-            <div className="flex items-center cursor-pointer">
-              <img
-                src={parsedCountry.label.props.children[0].props.src}
-                alt={parsedCountry.value}
-                className="mr-2 w-5 h-5"
-              />
-              {parsedCountry.value}
-            </div>
-          ),
-        };
-        setSelectedCountry(reconstructedCountry);
-      } catch (error) {
-        console.error("Error parsing stored country:", error);
-      }
-    }
-  }, []);
+    
+    }, []);
+    
+  useEffect(() => {
+    setSelectedCountry(user?.country);
+    setSelectedCurrency(user?.currency);
+  }, [user])
 
-  const handleCountryChange = (selectedOption: Country | null) => {
+  const updateUserData = async (data: any) => {
+    try {
+      const response = await apiAction({
+        method: "patch",
+        url: `${apiPath?.auth?.updateUser}`,
+        data: data,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          // 'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      });
+      if (response) {
+        dispatch(setUser(response?.data));
+        toast.success("User Updated Successfully");
+      }
+    } catch (error) {
+      console.error("Update failed:", error);
+    }
+  }
+
+  const handleCountryChange = async(selectedOption: Country | null) => {
+    let updatedFormData: any = {
+      country: selectedOption?.value,
+      userid: user.id,
+    };
+
+    updateUserData(updatedFormData)
     setSelectedCountry(selectedOption);
-    localStorage.setItem("selectedCountry", JSON.stringify(selectedOption));
-  };
+  };  
+
+  const handleCurrencyChange = async (selectedOption: Currency | null) => {
+    let updatedFormData: any = {
+      currency: selectedOption?.value,
+      userid: user.id,
+    };
+
+    updateUserData(updatedFormData)
+    setSelectedCurrency(selectedOption);
+  }
 
   const headerMenu = (
     <>
@@ -853,7 +874,7 @@ const Header = ({}: Props) => {
                         options={countries}
                         placeholder="Select a country"
                         onChange={handleCountryChange}
-                        value={selectedCountry}
+                        value={countries.find((it: any) => it.value === selectedCountry)}
                         isSearchable
                         className="cursor-pointer"
                       />
@@ -863,19 +884,9 @@ const Header = ({}: Props) => {
                         options={currencies}
                         placeholder="Select a currency"
                         className="cursor-pointer"
+                        onChange={handleCurrencyChange}
                         isSearchable
-                        value={
-                          selectedCountry
-                            ? {
-                                value:
-                                  Object.keys(selectedCountry.currency)[0] ||
-                                  "",
-                                label:
-                                  Object.keys(selectedCountry.currency)[0] ||
-                                  "",
-                              }
-                            : null
-                        }
+                        value={currencies.find((it: any) => it.value === selectedCurrency)}
                       />
                     </div>
                   </div>
